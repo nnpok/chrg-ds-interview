@@ -11,20 +11,21 @@ library(tidyverse)
 
 # Kaiser vaccination data
 kaiser_data = readRDS("kaiser_vacc.RDS") %>% 
+  filter(year != "2014-15") %>% 
   mutate(site = if_else(site == "comparison", "Comparison", "Intervention"))
 
 # Shoo the Flu vaccination data
 stf_data = readRDS("stf_vacc.RDS") %>% 
-  select(flu_season, n) %>% 
-  mutate(site = "Intervention",
+  mutate(year = paste0(substr(flu_season, 1, 5), substr(flu_season, 8,9)),
+         site = "Intervention",
          program = "Shoo the Flu",
          agecat = "5-12",
-         n = as.numeric(str_replace(n, ",", "")))
+         n = as.numeric(str_replace(n, ",", ""))) %>% 
+  select(-flu_season)
 
-# Combine kaiser_data and stf_data
-flu_data = rbind(kaiser_data, stf_data) 
+# Join data and create pretty labels
+flu_data = full_join(kaiser_data, stf_data) 
 
-# Format labels, there are no errors here. Trust us. :)
 flu_data = flu_data %>% 
   mutate(program = factor(program, levels=c("Shoo the Flu", "Kaiser")),
          color = paste0("Vaccination by ", program, "-", site)) %>% 
@@ -41,7 +42,7 @@ flu_data = flu_data %>%
 # Bar plot 
 ##################################
 
-plot_vacc_count = function(data) {
+plot_vacc_count = function(data, ylab_text) {
   
   p = ggplot(data, aes(x=year, y=n)) + 
     
@@ -59,14 +60,19 @@ plot_vacc_count = function(data) {
     theme_minimal() + 
     
     xlab("Influenza season") +
-    ylab("Population vaccinated") +
+    ylab(ylab_text) +
+    
+    geom_vline(xintercept=.4,
+               lty="dashed",
+               color = c("#00000000", "#00000000", "#00000000", "black", "#00000000")) +
     
     scale_x_discrete(breaks = NULL) +
-    scale_y_continuous(breaks = seq(0, 20000, 10000)) +
+    scale_y_continuous(breaks = seq(0, 40000, 10000)) +
     
     expand_limits(y = c(0, 40000)) +
      
     theme(axis.text.x = element_blank(),
+          legend.title = element_blank(),
           legend.text = element_text(size=12),
           legend.position = c(0.5, -0.20),
           panel.spacing = unit(0, "lines"),
@@ -81,7 +87,7 @@ plot_vacc_count = function(data) {
   return(p)
 }
 
-fig_vacc_count = plot_vacc_count(flu_data)
+fig_vacc_count = plot_vacc_count(data, ylab_text = "Population vaccinated")
 fig_vacc_count
 
 ggsave("fig_vaccination_by_year.png", fig_vacc_count, width = 12, height = 8)
